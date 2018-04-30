@@ -445,13 +445,13 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
         this.vertices = new GraphVertex[networkInputNames.size() + configuration.getVertices().size()];
 
         //All names: inputs, layers and graph nodes (index to name map)
-        Map<String, Integer> allNamesReverse = new HashMap<>();
+//        Map<String, Integer> allNamesReverse = new HashMap<>();
 
         //Create network input vertices:
         int vertexNumber = 0;
         for (String name : networkInputNames) {
             GraphVertex gv = new InputVertex(this, name, vertexNumber, null); //Output vertices: set later
-            allNamesReverse.put(name, vertexNumber);
+//            allNamesReverse.put(name, vertexNumber);
             vertices[vertexNumber++] = gv;
         }
 
@@ -550,12 +550,30 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
 //            vertices[vertexNumber++] = gv;
 //        }
 
+//        for( int x=0; x<indices.getTopologicalOrderIdxs().length; x++ ){
+//            String s = indices.getIdxToName().get(x);
+//            int idx = indices.getNameToIdx().get(s);
+//            if(x != idx){
+//                throw new RuntimeException();
+//            }
+//        }
+
+        System.out.println("/////////////////");
+        int tempNum = vertexNumber;
+        for (Map.Entry<String, org.deeplearning4j.nn.conf.graph.GraphVertex> nodeEntry : configVertexMap.entrySet()) {
+            System.out.println((tempNum++) + "\t" + nodeEntry.getKey() + "\t" + indices.getNameToIdx().get(nodeEntry.getKey()));
+
+        }
+        System.out.println("()()()()()()()()()()()");
+
 //        for (Map.Entry<String, org.deeplearning4j.nn.conf.graph.GraphVertex> nodeEntry : configVertexMap.entrySet()) {
         int numVertices = indices.topologicalOrderIdxs.length;
         for(; vertexNumber < numVertices; vertexNumber++){
 //            org.deeplearning4j.nn.conf.graph.GraphVertex n = nodeEntry.getValue();
 //            String name = nodeEntry.getKey();
             String name = indices.getIdxToName().get(vertexNumber);
+            System.out.println(vertexNumber + "\t" + name  + "\t" + indices.getNameToIdx().get(name));
+
             org.deeplearning4j.nn.conf.graph.GraphVertex n = configVertexMap.get(name);
             GraphVertex gv = n.instantiate(this, name, vertexNumber, paramsViewForVertex[vertexNumber],
                     initializeParams);
@@ -577,9 +595,10 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
                 }
             }
 
-            allNamesReverse.put(name, vertexNumber);
+//            allNamesReverse.put(name, vertexNumber);
             vertices[vertexNumber] = gv;
         }
+        System.out.println("/////////////////");
 
         layers = tempLayerList.toArray(new Layer[numLayers]);
 
@@ -626,7 +645,8 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
             VertexIndices[] inputIndices = new VertexIndices[vertexInputNames.size()];
             for (int j = 0; j < vertexInputNames.size(); j++) {
                 String inName = vertexInputNames.get(j);
-                int inputVertexIndex = allNamesReverse.get(inName);
+//                int inputVertexIndex = allNamesReverse.get(inName);
+                int inputVertexIndex = indices.getNameToIdx().get(inName);
 
                 //Output of vertex 'inputVertexIndex' is the jth input to the current vertex
                 //For input indices, we need to know which output connection of vertex 'inputVertexIndex' this represents
@@ -664,7 +684,8 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
 
                 int outputVertexInputNumber = nextVertexInputNames.indexOf(vertexName);
 
-                int outputVertexIndex = allNamesReverse.get(s);
+//                int outputVertexIndex = allNamesReverse.get(s);
+                int outputVertexIndex = indices.getNameToIdx().get(s);
                 outputIndices[j++] = new VertexIndices(outputVertexIndex, outputVertexInputNumber);
             }
             gv.setOutputVertices(outputIndices);
@@ -686,6 +707,12 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
 
         synchronizeIterEpochCounts();
         initCalled = true;
+
+
+//        System.out.println(Arrays.toString(vertices));
+        for(GraphVertex gv : vertices){
+            System.out.println(gv);
+        }
     }
 
     /**
@@ -1120,7 +1147,7 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
 //        if (topologicalOrder != null && topologicalOrderStr != null)
 //            return new Pair<>(topologicalOrder, topologicalOrderStr);
         if(networkIndices != null){
-            System.out.println(networkIndices);
+//            System.out.println(networkIndices);
             return networkIndices;
         }
 
