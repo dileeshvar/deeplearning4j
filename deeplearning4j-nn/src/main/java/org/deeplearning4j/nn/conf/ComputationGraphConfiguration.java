@@ -53,7 +53,7 @@ import java.util.*;
  * @author Alex Black
  */
 @Data
-@EqualsAndHashCode
+@EqualsAndHashCode(exclude = {"topologicalOrder", "topologicalOrderStr", "defaultConfiguration"})
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @NoArgsConstructor
 public class ComputationGraphConfiguration implements Serializable, Cloneable {
@@ -100,6 +100,8 @@ public class ComputationGraphConfiguration implements Serializable, Cloneable {
     //Counter for the number of epochs completed so far. Used for per-epoch schedules
     protected int epochCount = 0;
 
+    protected int[] topologicalOrder;
+    protected List<String> topologicalOrderStr;
 
     /**
      * @return JSON representation of configuration
@@ -241,6 +243,13 @@ public class ComputationGraphConfiguration implements Serializable, Cloneable {
         conf.vertexInputs = new LinkedHashMap<>();
         for (Map.Entry<String, List<String>> entry : this.vertexInputs.entrySet()) {
             conf.vertexInputs.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+
+        if(topologicalOrder != null){
+            conf.topologicalOrder = topologicalOrder.clone();
+        }
+        if(topologicalOrderStr != null){
+            conf.topologicalOrderStr = new ArrayList<>(topologicalOrderStr);
         }
 
         conf.networkInputs = new ArrayList<>();

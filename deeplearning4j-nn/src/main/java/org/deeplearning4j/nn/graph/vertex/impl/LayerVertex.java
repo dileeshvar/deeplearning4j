@@ -100,7 +100,8 @@ public class LayerVertex extends BaseGraphVertex {
     @Override
     public INDArray doForward(boolean training, LayerWorkspaceMgr workspaceMgr) {
         if (!canDoForward())
-            throw new IllegalStateException("Cannot do forward pass: all inputs not set");
+            throw new IllegalStateException("Cannot do forward pass: all inputs not set (layer name: \"" +
+                    getVertexName() + "\", index=" + getVertexIndex());
         return layer.activate(training, workspaceMgr);
     }
 

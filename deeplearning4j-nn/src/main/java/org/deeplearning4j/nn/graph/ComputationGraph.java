@@ -18,9 +18,7 @@
 
 package org.deeplearning4j.nn.graph;
 
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.Setter;
+import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -156,6 +154,7 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
      * (and hence also backward pass, which is the opposite to this) is conducted in the network.
      */
     protected int[] topologicalOrder;
+    private NetworkIndices networkIndices;
     /**
      * A list of layers. Each of these layers is present in a GraphVertex, but are here for easy reference.
      * This array also defines the order in which the getLayer(int) method returns layers.
@@ -433,6 +432,7 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
 
         //First: build topological ordering, based on configuration. Used for forward pass, backprop and order of parameters/gradients
         topologicalOrder = topologicalSortOrder();
+        NetworkIndices indices = getIndices();
 
         //Initialization: create the GraphVertex objects, based on configuration structure
         Map<String, org.deeplearning4j.nn.conf.graph.GraphVertex> configVertexMap = configuration.getVertices();
@@ -462,11 +462,18 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
         for (; i < configuration.getNetworkInputs().size(); i++) {
             numParamsForVertex[i] = 0; //No parameters for input vertices
         }
-        for (Map.Entry<String, org.deeplearning4j.nn.conf.graph.GraphVertex> nodeEntry : configVertexMap.entrySet()) {
-            org.deeplearning4j.nn.conf.graph.GraphVertex n = nodeEntry.getValue();
+//        for (Map.Entry<String, org.deeplearning4j.nn.conf.graph.GraphVertex> nodeEntry : configVertexMap.entrySet()) {
+//            org.deeplearning4j.nn.conf.graph.GraphVertex n = nodeEntry.getValue();
+//            numParamsForVertex[i] = n.numParams(true);
+//            numParams += numParamsForVertex[i];
+//            i++;
+//        }
+
+        for(; i<vertices.length; i++ ){
+            String vertexName = indices.getIdxToName().get(i);
+            org.deeplearning4j.nn.conf.graph.GraphVertex n = configVertexMap.get(vertexName);
             numParamsForVertex[i] = n.numParams(true);
             numParams += numParamsForVertex[i];
-            i++;
         }
 
         boolean initializeParams;
@@ -516,9 +523,40 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
         List<Layer> tempLayerList = new ArrayList<>();
         defaultConfiguration.clearVariables();
         List<String> variables = defaultConfiguration.variables(false);
-        for (Map.Entry<String, org.deeplearning4j.nn.conf.graph.GraphVertex> nodeEntry : configVertexMap.entrySet()) {
-            org.deeplearning4j.nn.conf.graph.GraphVertex n = nodeEntry.getValue();
-            String name = nodeEntry.getKey();
+//        for (Map.Entry<String, org.deeplearning4j.nn.conf.graph.GraphVertex> nodeEntry : configVertexMap.entrySet()) {
+//            org.deeplearning4j.nn.conf.graph.GraphVertex n = nodeEntry.getValue();
+//            String name = nodeEntry.getKey();
+//            GraphVertex gv = n.instantiate(this, name, vertexNumber, paramsViewForVertex[vertexNumber],
+//                    initializeParams);
+//
+//            if(gv == null){
+//                throw new IllegalStateException("Encountered null layer/vertex during initialization for layer \"" + name +
+//                        "\": " + n.getClass().getSimpleName() + " initialization returned null layer/vertex?");
+//            }
+//
+//            if (gv.hasLayer()) {
+//                numLayers++;
+//                Layer l = gv.getLayer();
+//                tempLayerList.add(l);
+//                List<String> layerVariables = l.conf().variables();
+//                if (layerVariables != null) {
+//                    for (String s : layerVariables) {
+//                        variables.add(gv.getVertexName() + "_" + s);
+//                    }
+//                }
+//            }
+//
+//            allNamesReverse.put(name, vertexNumber);
+//            vertices[vertexNumber++] = gv;
+//        }
+
+//        for (Map.Entry<String, org.deeplearning4j.nn.conf.graph.GraphVertex> nodeEntry : configVertexMap.entrySet()) {
+        int numVertices = indices.topologicalOrderIdxs.length;
+        for(; vertexNumber < numVertices; vertexNumber++){
+//            org.deeplearning4j.nn.conf.graph.GraphVertex n = nodeEntry.getValue();
+//            String name = nodeEntry.getKey();
+            String name = indices.getIdxToName().get(vertexNumber);
+            org.deeplearning4j.nn.conf.graph.GraphVertex n = configVertexMap.get(name);
             GraphVertex gv = n.instantiate(this, name, vertexNumber, paramsViewForVertex[vertexNumber],
                     initializeParams);
 
@@ -540,8 +578,9 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
             }
 
             allNamesReverse.put(name, vertexNumber);
-            vertices[vertexNumber++] = gv;
+            vertices[vertexNumber] = gv;
         }
+
         layers = tempLayerList.toArray(new Layer[numLayers]);
 
 
@@ -1071,15 +1110,45 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
      * Specifically, gradients/params/forward pass are executed on vertex[topologicalSortOrder[i]], for i=0..nVertices-1
      */
     public int[] topologicalSortOrder() {
-        if (topologicalOrder != null)
-            return topologicalOrder;
+        return getIndices().getTopologicalOrderIdxs();
+    }
 
-        //https://en.wikipedia.org/wiki/Topological_sorting#Kahn.27s_algorithm
-        Map<String, org.deeplearning4j.nn.conf.graph.GraphVertex> nodeMap = configuration.getVertices();
+//    private Triple<int[], Map<Integer,String>, Map<String,Integer>> buildIndexes(){
+    //First array: topological order as integer indexes. Second array: topological order as string.
+    //These two implicitly define a Map<String,Integer> and Map<Integer,String> for the vertex name/index mapping
+    private NetworkIndices getIndices(){
+//        if (topologicalOrder != null && topologicalOrderStr != null)
+//            return new Pair<>(topologicalOrder, topologicalOrderStr);
+        if(networkIndices != null){
+            System.out.println(networkIndices);
+            return networkIndices;
+        }
+
         List<String> networkInputNames = configuration.getNetworkInputs();
         int numVertices = networkInputNames.size() + configuration.getVertices().size();
         int[] out = new int[numVertices];
         int outCounter = 0;
+
+        if(configuration.getTopologicalOrderStr() != null && configuration.getTopologicalOrderStr().size() == numVertices
+                && configuration.getTopologicalOrder() != null && configuration.getTopologicalOrder().length == numVertices){
+            //Use saved topological order:
+            String[] str = configuration.getTopologicalOrderStr().toArray(new String[numVertices]);
+            topologicalOrder = configuration.getTopologicalOrder();
+//            topologicalOrderStr = str;
+
+
+            Map<String,Integer> m1 = new HashMap<>();
+            Map<Integer,String> m2 = new HashMap<>();
+            for(int i=0; i<str.length; i++ ){
+                m1.put(str[i], i);
+                m2.put(i, str[i]);
+            }
+
+            return new NetworkIndices(topologicalOrder, str, m1, m2);
+        }
+
+        //https://en.wikipedia.org/wiki/Topological_sorting#Kahn.27s_algorithm
+        Map<String, org.deeplearning4j.nn.conf.graph.GraphVertex> nodeMap = configuration.getVertices();
 
         //First: represent the graph more usefully as a Map<Integer,Set<Integer>>, where map represents edges i -> j
         // key represents j, set is set of i (inputs) for vertices j
@@ -1171,7 +1240,18 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
                                 + "\")");
         }
 
-        return out;
+        //Save the topological order:
+        List<String> toSave = new ArrayList<>(out.length);
+        for(int idx : out){
+//            toSave.add(vertices[idx].getVertexName());
+            toSave.add(vertexNamesMap.get(idx));
+        }
+        configuration.setTopologicalOrderStr(toSave);
+        configuration.setTopologicalOrder(out);
+
+        this.topologicalOrder = out;
+        networkIndices = new NetworkIndices(topologicalOrder, toSave.toArray(new String[toSave.size()]), vertexNamesMap2, vertexNamesMap);
+        return networkIndices;
     }
 
     @Override
@@ -1972,6 +2052,8 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
                 GraphVertex current = vertices[topologicalOrder[i]];
                 String vName = current.getVertexName();
                 int vIdx = current.getVertexIndex();
+
+//                System.out.println(i + "\t" + vName + "\t" + vIdx);
 
                 //First: determine what workspace manager we should use for forward pass in this vertex
                 LayerWorkspaceMgr workspaceMgr;
@@ -4074,5 +4156,14 @@ public class ComputationGraph implements Serializable, Model, NeuralNetwork {
             return paramsEquals && confEquals && updaterEquals;
         }
         return false;
+    }
+
+    @AllArgsConstructor
+    @Data
+    private static class NetworkIndices {
+        private int[] topologicalOrderIdxs;
+        private String[] topologicalOrderStr;
+        private Map<String,Integer> nameToIdx;
+        private Map<Integer,String> idxToName;
     }
 }
