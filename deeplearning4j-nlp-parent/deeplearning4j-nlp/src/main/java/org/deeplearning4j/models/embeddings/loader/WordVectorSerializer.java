@@ -1254,7 +1254,7 @@ public class WordVectorSerializer {
             Line 0 - VectorsConfiguration JSON string
             Line 1 - expTable
             Line 2 - table
-        
+
             All following lines are vocab/weight lookup table saved line by line as VocabularyWord JSON representation
          */
 
@@ -1657,7 +1657,11 @@ public class WordVectorSerializer {
         //reposition buffer to be one line ahead
         if (hasHeader) {
             line = "";
-            iter.close();
+            try{
+                  iter.close();
+              } catch(IOException e){
+                  throw new RuntimeException(e);
+              }
             reader = new BufferedReader(new FileReader(vectorsFile));
             iter = IOUtils.lineIterator(reader);
             iter.nextLine();
@@ -1703,7 +1707,11 @@ public class WordVectorSerializer {
 
         lookupTable.setSyn0(syn);
 
-        iter.close();
+        try{
+            iter.close();
+        } catch(IOException e){
+            throw new RuntimeException(e);
+        }
 
         try {
             reader.close();
