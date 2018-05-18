@@ -18,6 +18,7 @@
 package org.deeplearning4j.nn.modelimport.keras.e2e;
 
 import lombok.extern.slf4j.Slf4j;
+import lombok.val;
 import org.deeplearning4j.eval.ROCMultiClass;
 import org.deeplearning4j.gradientcheck.GradientCheckUtil;
 import org.deeplearning4j.nn.api.Layer;
@@ -27,6 +28,8 @@ import org.deeplearning4j.nn.conf.layers.FeedForwardLayer;
 import org.deeplearning4j.nn.conf.layers.LossLayer;
 import org.deeplearning4j.nn.conf.layers.RnnOutputLayer;
 import org.deeplearning4j.nn.graph.ComputationGraph;
+import org.deeplearning4j.nn.layers.recurrent.LSTM;
+import org.deeplearning4j.nn.layers.recurrent.LastTimeStepLayer;
 import org.deeplearning4j.nn.layers.wrapper.BaseWrapperLayer;
 import org.deeplearning4j.nn.modelimport.keras.Hdf5Archive;
 import org.deeplearning4j.nn.modelimport.keras.KerasModel;
@@ -473,8 +476,10 @@ public class KerasModelEndToEndTest {
                         KerasModelEndToEndTest.class.getClassLoader());
         File modelFile = createTempFile(TEMP_MODEL_FILENAME, H5_EXTENSION);
         Files.copy(modelResource.getInputStream(), modelFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        MultiLayerNetwork model = new KerasModel().modelBuilder().modelHdf5Filename(modelFile.getAbsolutePath())
-                .enforceTrainingConfig(false).buildSequential().getMultiLayerNetwork();
+        KerasSequentialModel kerasModel = new KerasModel().modelBuilder().modelHdf5Filename(modelFile.getAbsolutePath())
+                .enforceTrainingConfig(false).buildSequential();
+
+        MultiLayerNetwork model = kerasModel.getMultiLayerNetwork();
 
         ClassPathResource outputsResource =
                 new ClassPathResource(inputsOutputsPath,
@@ -505,7 +510,9 @@ public class KerasModelEndToEndTest {
                 if (outputs.shape()[0] == 1) {
                     outputs = outputs.reshape(outputs.shape()[1], outputs.shape()[0]);
                 }
-                int nOut = outputs.shape()[outputs.shape().length - 1];
+
+                // FIXME: int cast
+                val nOut = (int) outputs.shape()[outputs.shape().length - 1];
                 compareMulticlassAUC("predictions", outputs, predictionsKeras, predictionsDl4j, nOut, EPS);
             }
 
@@ -518,12 +525,14 @@ public class KerasModelEndToEndTest {
                 INDArray testLabels = Nd4j.create(predictionsDl4j.shape());
                 if (testLabels.rank() == 2) {
                     for (int i = 0; i < testLabels.size(0); i++) {
-                        testLabels.putScalar(i, r.nextInt(testLabels.size(1)), 1.0);
+                        // FIXME: int cast
+                        testLabels.putScalar(i, r.nextInt((int) testLabels.size(1)), 1.0);
                     }
                 } else if (testLabels.rank() == 3) {
                     for (int i = 0; i < testLabels.size(0); i++) {
                         for (int j = 0; j < testLabels.size(1); j++) {
-                            testLabels.putScalar(i, j, r.nextInt(testLabels.size(1)), 1.0);
+                            // FIXME: int cast
+                            testLabels.putScalar(i, j, r.nextInt((int) testLabels.size(1)), 1.0);
                         }
                     }
                 } else {
